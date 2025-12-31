@@ -19,35 +19,35 @@ def load_data():
     df = pd.read_csv(URL)
     return df
 
-df = load_data()
+df = load_data().drop('patient_id', axis=1)
 
 model = joblib.load('./insulin_dosage_predictor.joblib')
 
+num_cols = ['age', 'glucose_level', 'physical_activity', 'BMI', 'HbA1c', 'weight', 'insulin_sensitivity', 'sleep_hours', 'creatinine']
+nominal_cols = ['gender', 'previous_medications']
+ordinal_cols = ['family_history', 'food_intake']
+    
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), num_cols),
+        ('nom', OneHotEncoder(sparse_output=False), nominal_cols),
+        ('ord', OrdinalEncoder(), ordinal_cols)
+    ]
+)
+
 @st.cache_resource
 def train_model(data):
-    num_cols = ['age', 'glucose_level', 'physical_activity', 'BMI', 'HbA1c', 'weight', 'insulin_sensitivity', 'sleep_hours', 'creatinine']
-    nominal_cols = ['gender', 'previous_medications']
-    ordinal_cols = ['family_history', 'food_intake']
-    
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', StandardScaler(), num_cols),
-            ('nom', OneHotEncoder(sparse_output=False), nominal_cols),
-            ('ord', OrdinalEncoder(), ordinal_cols)
-        ]
-    )
-    
+
     x = data.drop('Insulin', axis=1)
     y = data['Insulin']
     
     x_transformed = preprocessor.fit_transform(x)
     x_train, x_test, y_train, y_test = train_test_split(x_transformed, y, test_size=0.3)
-    
     model.fit(x_train, y_train)
     acc = accuracy_score(y_test, model.predict(x_test))
-    return acc
+    return model, acc
     
-accuracy = train_model(df)
+model, accuracy = train_model(df)
 
 st.sidebar.title('Insulin Dosage Predictor App')
 page = st.sidebar.radio('Navigate', ['Predictor', 'Data'])
@@ -57,6 +57,42 @@ st.sidebar.caption('Website created with Streamlit')
 if page == 'Predictor':
     st.title("Insulin Dosage Predictor")
     st.success(f'Model Accuracy: {(accuracy*100):.4f}%')
+
+    with st.form('prediction_form'):
+        c1, c2, c3 = st.columns(3, vertical_alignment="center")
+        gender = c1.selectbox('Gender', ['male', 'female'])
+        age = c2.slider('Age (years)', min_value=18, max_value=80, value=35, step=1)
+        family_history = c3.checkbox('Family has history of diabetes?', False)
+        
+        c4, c5, c6 = st.columns(3)
+        glucose_level = c4.number_input('Glucose level (mg/dl)', min_value=30.0, max_value=300.0, value=140.0, step=0.01)
+        physical_activity = c5.slider('Physical activity (hours)', min_value=0.0, max_value=12.0, value=2.0, step=0.05)
+        food_intake = c6.selectbox('Food intake', ['low', 'medium', 'high'])
+        
+        c7, c8, c9 = st.columns(3)
+        previous_medications = c7.selectbox('Previous medications', ['none', 'oral', 'insulin', 'both'])
+        BMI = c8.slider('BMI (kg/m²)', min_value=14.0, max_value=42.0, value=30.0, step=0.01)
+        HbA1c = c9.slider('Haemoglobin A1c level (%)', min_value=0.0, max_value=20.0, value=8.0, step=0.01)
+
+        c10, c11 = st.columns(2)
+        weight = c10.number_input('Weight (kg)', min_value=30.0, max_value=150.0, value=80.0, step=0.01)
+        insulin_sensitivity = c11.slider('Insulin sensitivity', min_value=0.0, max_value=5.0, value=1.5, step=0.01)
+
+        c12, c13 = st.columns(2)
+        sleep_hours = c12.slider('Hours of sleep per day', min_value=0.0, max_value=12.0, value=8.0, step=0.25)
+        creatinine = c13.slider('Serum creatinine level (mg/dL)', min_value=1.0, max_value=5.0, value=1.3, step=0.01)
+        
+        submit_btn = st.form_submit_button('Analyse Risk', type='primary')
+
+    st.divider()
+
+    if submit_btn:
+        input_data = pd.DataFrame([[gender, age, family_history, glucose_level, physical_activity, food_intake, previous_medications, BMI, HbA1c, weight, insulin_sensitivity, sleep_hours, creatinine]], columns=df.columns[:-1])
+        st.dataframe(input_data)
+        transformed_data = preprocessor.fit_transform(input_data)
+        prediction = model.predict(transformed_data)[0]
+        # prob = model.predict_proba(input_data)[0][1]
+
 elif page == 'Data':
     st.title("A Glance At The Dataset")
     st.markdown('Explore the dataset.')
@@ -65,6 +101,20 @@ elif page == 'Data':
     tab1, tab2, tab3 = st.tabs(['Overview', 'Distributions', 'Raw Data'])
     
     with tab1: 
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1:
+            st.metric('Total Records', len(df),'Data size', delta_color='off', delta_arrow="off")
+        with c2:
+            st.metric('Avg. Glucose Level', f"{df['glucose_level'].mean():.1f}",'mg/dl', delta_color='off', delta_arrow="off")
+        with c3:
+            st.metric('Avg. Physical Activity', f"{df['physical_activity'].mean():.2f}",'hours', delta_color='off', delta_arrow="off")
+        with c4:
+            st.metric('Avg. BMI', f"{df['BMI'].mean():.2f}",'kg/m²', delta_color='off', delta_arrow="off")
+        with c5:
+            st.metric('Avg. Haemoglobin A1c Level', f"{df['HbA1c'].mean():.2f}",'%', delta_color='off', delta_arrow="off")
+        with c6:
+            st.metric('Avg. Weight', f"{df['weight'].mean():.2f}",'kg', delta_color='off', delta_arrow="off")
+        
         fig1 = px.histogram(df, x='BMI', y='glucose_level', color='Insulin', hover_data=['BMI', 'glucose_level'], title='BMI vs Glucose')
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -82,6 +132,30 @@ elif page == 'Data':
         fig5 = px.histogram(df, x='weight', y='glucose_level', color='Insulin', hover_data=['weight', 'glucose_level'], title='Weight vs Glucose')
         st.plotly_chart(fig5, use_container_width=True)
 
+    with tab2: 
+        st.markdown("Distribution of various variables in the dataset")
+        c2_1, c2_2, c2_3 = st.columns(3)
+        
+        with c2_1: 
+            for col in df.columns[1::3]:
+                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
+                st.plotly_chart(fig, use_container_width=True)
+
+        with c2_2: 
+            for col in df.columns[2::3]:
+                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
+                st.plotly_chart(fig, use_container_width=True)
+
+        with c2_3: 
+            for col in df.columns[3::3]:
+                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
+                st.plotly_chart(fig, use_container_width=True)
+
+    with tab3: 
+            st.subheader('Raw data')
+            st.markdown('A sample of 50 rows of data from the dataset.')
+            st.dataframe(df.sample(50))
+            st.markdown('Source: https://www.kaggle.com/datasets/robyburns/insulin-dosage')
 
 
 
