@@ -21,12 +21,12 @@ def load_data():
 
 df = load_data().drop('patient_id', axis=1)
 
-model = joblib.load('./insulin_dosage_predictor.joblib')
+model = joblib.load('./insulin_dosage_predictor_v2.joblib')
 
 num_cols = ['age', 'glucose_level', 'physical_activity', 'BMI', 'HbA1c', 'weight', 'insulin_sensitivity', 'sleep_hours', 'creatinine']
 nominal_cols = ['gender', 'previous_medications']
 ordinal_cols = ['family_history', 'food_intake']
-    
+
 preprocessor = ColumnTransformer(
     transformers=[
         ('num', StandardScaler(), num_cols),
@@ -37,7 +37,6 @@ preprocessor = ColumnTransformer(
 
 @st.cache_resource
 def train_model(data):
-
     x = data.drop('Insulin', axis=1)
     y = data['Insulin']
     
@@ -62,7 +61,7 @@ if page == 'Predictor':
         c1, c2, c3 = st.columns(3, vertical_alignment="center")
         gender = c1.selectbox('Gender', ['male', 'female'])
         age = c2.slider('Age (years)', min_value=18, max_value=80, value=35, step=1)
-        family_history = c3.checkbox('Family has history of diabetes?', False)
+        family_history = c3.selectbox('Family has history of diabetes?', ['yes', 'no'], index=1)
         
         c4, c5, c6 = st.columns(3)
         glucose_level = c4.number_input('Glucose level (mg/dl)', min_value=30.0, max_value=300.0, value=140.0, step=0.01)
@@ -88,10 +87,17 @@ if page == 'Predictor':
 
     if submit_btn:
         input_data = pd.DataFrame([[gender, age, family_history, glucose_level, physical_activity, food_intake, previous_medications, BMI, HbA1c, weight, insulin_sensitivity, sleep_hours, creatinine]], columns=df.columns[:-1])
-        st.dataframe(input_data)
-        transformed_data = preprocessor.fit_transform(input_data)
+        preprocessor.fit(df.drop('Insulin', axis=1))
+        transformed_data = preprocessor.transform(input_data)
         prediction = model.predict(transformed_data)[0]
-        # prob = model.predict_proba(input_data)[0][1]
+        if prediction == 'steady':
+            st.warning(f"You require a steady insulin dosage.")
+        elif prediction == 'up':
+            st.error(f"You require a higher insulin dosage.")
+        elif prediction == 'down':
+            st.info(f"You require a lower insulin dosage.")
+        else:
+            st.success(f"You require {prediction} insulin dosage.")
 
 elif page == 'Data':
     st.title("A Glance At The Dataset")
