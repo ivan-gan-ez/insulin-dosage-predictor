@@ -107,7 +107,7 @@ elif page == 'Data':
     tab1, tab2, tab3 = st.tabs(['Overview', 'Distributions', 'Raw Data'])
     
     with tab1: 
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1, c2, c3, c4, c5, c6 = st.columns([4/28, 5/28, 5/28, 4/28, 6/28, 4/28])
         with c1:
             st.metric('Total Records', len(df),'Data size', delta_color='off', delta_arrow="off")
         with c2:
