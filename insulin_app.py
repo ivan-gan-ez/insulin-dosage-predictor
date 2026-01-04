@@ -48,6 +48,7 @@ def train_model(data):
     
 model, accuracy = train_model(df)
 
+st.logo('IDPA logo.svg')
 st.sidebar.title('Insulin Dosage Predictor App')
 page = st.sidebar.radio('Navigate', ['Predictor', 'Data'])
 st.sidebar.markdown('---')
