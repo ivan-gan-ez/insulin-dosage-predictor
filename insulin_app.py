@@ -139,22 +139,19 @@ elif page == 'Data':
 
     with tab2: 
         st.markdown("Distribution of various variables in the dataset")
-        c2_1, c2_2, c2_3 = st.columns(3)
+        c2_1, c2_2 = st.columns(2)
         
         with c2_1: 
-            for col in df.columns[1::3]:
-                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
+            for col in df.columns[::2]:
+                fig = px.histogram(df, x=col, color="Insulin", title=col.replace("_", " ").capitalize())
                 st.plotly_chart(fig, use_container_width=True)
 
         with c2_2: 
-            for col in df.columns[2::3]:
-                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
+            for col in df.columns[1:-1:2]:
+                fig = px.histogram(df, x=col, color="Insulin", title=col.replace("_", " ").capitalize())
                 st.plotly_chart(fig, use_container_width=True)
-
-        with c2_3: 
-            for col in df.columns[3::3]:
-                fig = px.histogram(df, x=col, title=col.replace("_", " ").capitalize())
-                st.plotly_chart(fig, use_container_width=True)
+            insulin_fig = px.histogram(df, x='Insulin', title='Insulin')
+            st.plotly_chart(insulin_fig, use_container_width=True)
 
     with tab3: 
             st.subheader('Raw data')
